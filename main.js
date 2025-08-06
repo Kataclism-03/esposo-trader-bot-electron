@@ -1,10 +1,12 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const config = require('./config/config');
+const TelegramService = require('./services/telegram');
 
 // --- CONFIGURACIÓN ---
-const USUARIOS_DB = path.join(__dirname, 'data', 'usuarios_registrados.json');
-const VERSION_ACTUAL = "3.0.0";
+const USUARIOS_DB = path.join(__dirname, 'data', config.files.usersDatabase);
+const VERSION_ACTUAL = config.app.version;
 
 // Crear directorio data si no existe
 const dataDir = path.join(__dirname, 'data');
@@ -29,13 +31,14 @@ function showRegistroWindow() {
     
     currentWindow = new BrowserWindow({
         width: 400,
-        height: 300,
+        height: 350,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         },
         resizable: false,
-        title: "Registro - Esposo Trader Bot"
+        title: `Registro - ${config.app.name}`,
+        icon: path.join(__dirname, 'assets', 'icon.png') // Opcional
     });
 
     currentWindow.loadFile('renderer/registro.html');
@@ -49,14 +52,14 @@ function showLoginWindow() {
     if (currentWindow) currentWindow.close();
     
     currentWindow = new BrowserWindow({
-        width: 300,
-        height: 200,
+        width: 320,
+        height: 220,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         },
         resizable: false,
-        title: "Login - Esposo Trader Bot"
+        title: `Login - ${config.app.name}`
     });
 
     currentWindow.loadFile('renderer/login.html');
@@ -70,14 +73,16 @@ function showBotWindow() {
     if (currentWindow) currentWindow.close();
     
     currentWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 900,
+        height: 700,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
         },
         resizable: true,
-        title: "Esposo Trader Bot v" + VERSION_ACTUAL
+        title: `${config.app.name} v${VERSION_ACTUAL}`,
+        minWidth: 800,
+        minHeight: 600
     });
 
     currentWindow.loadFile('renderer/bot.html');
@@ -96,26 +101,49 @@ ipcMain.handle('cargar-usuarios', () => {
     return {};
 });
 
-ipcMain.handle('guardar-usuario', (event, correo) => {
+ipcMain.handle('guardar-usuario', async (event, correo) => {
     const usuarios = fs.existsSync(USUARIOS_DB) ? 
         JSON.parse(fs.readFileSync(USUARIOS_DB, 'utf8')) : {};
     
-    usuarios[correo] = true;
+    usuarios[correo] = {
+        email: correo,
+        registeredAt: new Date().toISOString(),
+        lastLogin: null
+    };
+    
     fs.writeFileSync(USUARIOS_DB, JSON.stringify(usuarios, null, 2));
     
     // Notificar a Telegram
-    const TelegramService = require('./services/telegram');
-    TelegramService.notificarTelegram(`Nuevo registro: ${correo}`);
+    await TelegramService.notificarRegistro(correo);
     
     return true;
 });
 
-ipcMain.handle('verificar-usuario', (event, correo) => {
+ipcMain.handle('verificar-usuario', async (event, correo) => {
     if (fs.existsSync(USUARIOS_DB)) {
         const usuarios = JSON.parse(fs.readFileSync(USUARIOS_DB, 'utf8'));
-        return usuarios[correo] || false;
+        const usuario = usuarios[correo];
+        
+        if (usuario) {
+            // Actualizar último login
+            usuario.lastLogin = new Date().toISOString();
+            fs.writeFileSync(USUARIOS_DB, JSON.stringify(usuarios, null, 2));
+            return true;
+        }
     }
     return false;
+});
+
+ipcMain.handle('get-config', () => {
+    return config;
+});
+
+ipcMain.handle('get-affiliate-links', () => {
+    return config.affiliate;
+});
+
+ipcMain.handle('open-external', (event, url) => {
+    shell.openExternal(url);
 });
 
 ipcMain.handle('show-registro', () => {
@@ -130,7 +158,26 @@ ipcMain.handle('show-bot', () => {
     showBotWindow();
 });
 
-app.whenReady().then(createWindow);
+// Handlers para el bot de trading
+ipcMain.handle('get-trading-config', () => {
+    return config.trading;
+});
+
+ipcMain.handle('get-brokers-config', () => {
+    return config.brokers;
+});
+
+// Handler para cerrar la aplicación
+ipcMain.handle('quit-app', () => {
+    app.quit();
+});
+
+// Eventos de la aplicación
+app.whenReady().then(() => {
+    createWindow();
+    
+    console.log(`${config.app.name} v${config.app.version} iniciado`);
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
@@ -142,4 +189,15 @@ app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
     }
+});
+
+// Manejar errores no capturados
+process.on('uncaughtException', (error) => {
+    console.error('Error no capturado:', error);
+    // Opcionalmente notificar por Telegram
+    TelegramService.notificarError(`Error crítico: ${error.message}`);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Promesa rechazada no manejada:', reason);
 });
