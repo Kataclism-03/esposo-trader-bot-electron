@@ -1,4 +1,7 @@
+// Servicios/signals.js
+
 const BrokerAPI = require('./broker-api');
+const { BlitzOptionsDirection } = require('@tradecodehub/client-sdk-js');
 
 class SignalGenerator {
     constructor(config, brokerApi) {
@@ -57,11 +60,11 @@ class SignalGenerator {
         }
 
         if (buffer1[len - 1] > buffer2[len - 1] && buffer1[len - 2] <= buffer2[len - 2]) {
-            return 'call';
+            return BlitzOptionsDirection.Call;
         }
         
         if (buffer1[len - 1] < buffer2[len - 1] && buffer1[len - 2] >= buffer2[len - 2]) {
-            return 'put';
+            return BlitzOptionsDirection.Put;
         }
 
         return null;
@@ -69,6 +72,7 @@ class SignalGenerator {
 
     async generateSignals() {
         try {
+            // Se usa un nuevo método getCandles en BrokerAPI para interactuar con el SDK
             const candles = await this.brokerApi.getCandles(this.activo, this.tiempo, 200);
 
             if (!candles || candles.length === 0) {
