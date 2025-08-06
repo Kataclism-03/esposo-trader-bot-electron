@@ -54,12 +54,16 @@ const config = {
         iqoption: {
             name: "IQ Option",
             apiUrl: "https://iqoption.com/api",
-            wsUrl: "wss://iqoption.com/echo/websocket"
+            wsUrl: "wss://iqoption.com/echo/websocket",
+            clientId: 303, // Nuevo campo necesario para el SDK
+            connectionId: 303 // Nuevo campo necesario para el SDK
         },
         exnova: {
             name: "Exnova", 
             apiUrl: "https://exnova.com/api",
-            wsUrl: "wss://exnova.com/echo/websocket"
+            wsUrl: "wss://exnova.com/echo/websocket",
+            clientId: 303, // Nuevo campo necesario para el SDK
+            connectionId: 303 // Nuevo campo necesario para el SDK
         }
     }
 };
