@@ -1,231 +1,152 @@
-const axios = require('axios');
+const { IQOptionClient } = require('@tradecodehub/client-sdk-js');
 
-// Clase base para la API de brokers (IQ Option y Exnova usan la misma API)
 class BrokerAPI {
     constructor(brokerType = 'iqoption') {
-        this.brokerType = brokerType;
+        this.client = new IQOptionClient({ broker: brokerType });
         this.isConnected = false;
         this.balance = 0;
+        this.balanceType = 'PRACTICE';
         this.email = '';
         this.password = '';
-        
-        // URLs base para cada broker
-        this.brokerUrls = {
-            iqoption: 'https://iqoption.com/api',
-            exnova: 'https://exnova.com/api'
-        };
-        
-        this.baseUrl = this.brokerUrls[brokerType];
+        this.logCallback = null;
     }
 
-    // Configurar credenciales
     setCredentials(email, password) {
         this.email = email;
         this.password = password;
     }
+    
+    setLogCallback(callback) {
+        this.logCallback = callback;
+    }
 
-    // Conectar al broker
     async connect() {
+        if (this.isConnected) return true;
+
+        if (!this.email || !this.password) {
+            this.logCallback('❌ Credenciales no configuradas.');
+            return false;
+        }
+
         try {
-            console.log(`Conectando a ${this.brokerType.toUpperCase()}...`);
+            this.logCallback(`Conectando a ${this.client.broker.toUpperCase()}...`);
             
-            // En una implementación real, aquí harías la conexión real a la API
-            // Por ahora simularemos la conexión
-            await this.simulateConnection();
-            
-            this.isConnected = true;
-            this.balance = 1000.00; // Balance simulado inicial
-            
-            console.log(`✅ Conectado exitosamente a ${this.brokerType.toUpperCase()}`);
-            return true;
-            
+            const result = await this.client.connect(this.email, this.password);
+
+            if (result.success) {
+                this.isConnected = true;
+                this.logCallback('✅ Conectado exitosamente.');
+                
+                const balance = await this.client.getBalance(this.balanceType);
+                this.balance = balance.amount;
+                
+                this.logCallback(`Balance inicial (${this.balanceType}): $${this.balance.toFixed(2)}`);
+                
+                return true;
+            } else {
+                this.logCallback(`❌ Error de conexión: ${result.message}`);
+                return false;
+            }
         } catch (error) {
-            console.error(`❌ Error de conexión a ${this.brokerType.toUpperCase()}:`, error.message);
-            this.isConnected = false;
+            this.logCallback(`❌ Error crítico de conexión: ${error.message}`);
             return false;
         }
     }
 
-    // Simular conexión (reemplazar por implementación real)
-    async simulateConnection() {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                // Simular diferentes escenarios de conexión
-                if (!this.email || !this.password) {
-                    reject(new Error('Credenciales no configuradas'));
-                    return;
-                }
-                
-                // Simular 90% de éxito en conexión
-                if (Math.random() > 0.1) {
-                    resolve();
-                } else {
-                    reject(new Error('Error de red'));
-                }
-            }, 2000);
-        });
-    }
-
-    // Desconectar
-    disconnect() {
+    async disconnect() {
+        if (!this.isConnected) return;
+        await this.client.disconnect();
         this.isConnected = false;
         this.balance = 0;
-        console.log(`🔌 Desconectado de ${this.brokerType.toUpperCase()}`);
+        this.logCallback('🔌 Desconectado.');
     }
 
-    // Verificar estado de conexión
     checkConnection() {
         return this.isConnected;
     }
 
-    // Obtener balance actual
-    getBalance() {
+    async getBalance() {
+        if (!this.isConnected) return 0;
+        const balance = await this.client.getBalance(this.balanceType);
+        this.balance = balance.amount;
         return this.balance;
     }
-
-    // Cambiar a cuenta demo o real
-    changeBalance(type = 'PRACTICE') {
-        if (type === 'PRACTICE') {
-            this.balance = 1000.00; // Balance demo
-        } else {
-            this.balance = 0.00; // Balance real (requeriría depósito)
+    
+    async changeBalance(type = 'PRACTICE') {
+        if (!this.isConnected) {
+            this.logCallback('No conectado para cambiar el balance.');
+            return false;
         }
-        return this.balance;
+        
+        this.balanceType = type.toUpperCase();
+        this.logCallback(`Cambiando a cuenta ${this.balanceType}...`);
+        
+        const newBalance = await this.client.getBalance(this.balanceType);
+        this.balance = newBalance.amount;
+        
+        this.logCallback(`Balance actual en ${this.balanceType}: $${this.balance.toFixed(2)}`);
+        return true;
     }
 
-    // Obtener datos de velas
-    async getCandles(asset, timeframe, count, endTime = null) {
+    async getCandles(asset, timeframe, count) {
         if (!this.isConnected) {
             throw new Error('No conectado al broker');
         }
 
         try {
-            // En implementación real, aquí harías la llamada a la API del broker
-            // Por ahora simularemos datos de velas
-            return this.simulateCandles(asset, timeframe, count, endTime);
-            
+            const candles = await this.client.getCandles(asset, timeframe, count);
+            return candles;
         } catch (error) {
-            console.error('Error obteniendo velas:', error.message);
+            this.logCallback(`Error obteniendo velas: ${error.message}`);
             throw error;
         }
     }
 
-    // Simular datos de velas (reemplazar por implementación real)
-    simulateCandles(asset, timeframe, count, endTime) {
-        const candles = [];
-        const now = endTime || Date.now();
-        let price = 1.1000; // Precio base para EURUSD
-        
-        for (let i = count - 1; i >= 0; i--) {
-            const time = now - (i * timeframe * 1000);
-            const variation = (Math.random() - 0.5) * 0.002;
-            price += variation;
-            
-            const open = price - (variation / 2);
-            const high = price + (Math.random() * 0.0005);
-            const low = price - (Math.random() * 0.0005);
-            const close = price;
-            
-            candles.push({
-                time: time / 1000, // Timestamp en segundos
-                open: parseFloat(open.toFixed(5)),
-                high: parseFloat(high.toFixed(5)),
-                low: parseFloat(low.toFixed(5)),
-                close: parseFloat(close.toFixed(5)),
-                volume: Math.floor(Math.random() * 1000) + 500
-            });
-        }
-        
-        return candles;
-    }
-
-    // Realizar operación de compra
     async buy(amount, asset, direction, timeframe) {
         if (!this.isConnected) {
             throw new Error('No conectado al broker');
         }
 
-        if (amount > this.balance) {
-            throw new Error('Balance insuficiente');
-        }
-
         try {
-            // En implementación real, aquí harías la llamada a la API del broker
-            const operationId = this.generateOperationId();
-            
-            console.log(`📊 Operación iniciada: ${direction.toUpperCase()} ${asset} $${amount} (${timeframe}min)`);
-            
-            // Simular operación
-            this.balance -= amount;
-            
-            return {
-                success: true,
-                id: operationId,
-                amount: amount,
-                asset: asset,
-                direction: direction,
-                timeframe: timeframe
-            };
-            
+            const result = await this.client.buy(amount, asset, direction, timeframe, this.balanceType);
+            if (result.success) {
+                this.logCallback(`📊 Operación iniciada: ${direction.toUpperCase()} ${asset} $${amount} (${timeframe}min)`);
+                return result.id;
+            } else {
+                throw new Error(`Error al iniciar operación: ${result.message}`);
+            }
         } catch (error) {
-            console.error('Error ejecutando operación:', error.message);
+            this.logCallback(`Error ejecutando operación: ${error.message}`);
             throw error;
         }
     }
 
-    // Verificar resultado de operación
     async checkWin(operationId) {
         if (!this.isConnected) {
             throw new Error('No conectado al broker');
         }
 
         try {
-            // En implementación real, verificarías el resultado real
-            // Por ahora simularemos el resultado
-            return await this.simulateOperationResult(operationId);
-            
+            const result = await this.client.checkWin(operationId);
+            return result;
         } catch (error) {
-            console.error('Error verificando resultado:', error.message);
+            this.logCallback(`Error verificando resultado: ${error.message}`);
             throw error;
         }
     }
 
-    // Simular resultado de operación
-    async simulateOperationResult(operationId) {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // Simular 70% de probabilidad de ganar
-                const isWin = Math.random() < 0.7;
-                
-                if (isWin) {
-                    const profit = 0.8; // 80% de ganancia
-                    resolve(profit);
-                } else {
-                    resolve(-1); // Pérdida total
-                }
-            }, 2000); // Simular tiempo de espera de resultado
-        });
-    }
-
-    // Generar ID único para operación
-    generateOperationId() {
-        return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    }
-
-    // Obtener información del activo
     async getAssetInfo(asset) {
         if (!this.isConnected) {
             throw new Error('No conectado al broker');
         }
 
-        // Simular información del activo
-        return {
-            asset: asset,
-            isOpen: true,
-            payout: 0.8, // 80% de payout
-            minAmount: 1.0,
-            maxAmount: 1000.0
-        };
+        try {
+            const info = await this.client.getAssetInfo(asset);
+            return info;
+        } catch (error) {
+            this.logCallback(`Error obteniendo info del activo: ${error.message}`);
+            throw error;
+        }
     }
 }
 
