@@ -9,34 +9,95 @@ const BrokerAPI = require('./Servicios/broker-api');
 const TradingBot = require('./Servicios/trading-bot');
 const SignalGenerator = require('./Servicios/signals');
 
-// ... (El resto de tu código es igual)
+// --- Ventana principal ---
+let mainWindow;
+const createWindow = () => {
+    mainWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false
+        }
+    });
+
+    mainWindow.loadFile(path.join(__dirname, 'frontend', 'login.html'));
+    
+    // Abrir DevTools (solo en modo de desarrollo)
+    // mainWindow.webContents.openDevTools();
+};
+
+app.whenReady().then(() => {
+    createWindow();
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
+});
+
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+// --- Función para enviar logs a la ventana de la UI ---
+let logCallback = (message) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('log-message', message);
+    }
+};
+
+let uiCallback = (data) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('ui-update', data);
+    }
+};
 
 // --- Variables globales para el bot de trading ---
 let tradingBot = null;
-const selectedBrokerConfig = config.brokers.iqoption; // Selecciona la corretora a ser usada
-const brokerApi = new BrokerAPI(selectedBrokerConfig, logCallback);
+let userCredentials = null; // Almacenará las credenciales después del login
+const selectedBrokerConfig = config.brokers.iqoption; // Selecciona la corretora
+const brokerApi = new BrokerAPI(selectedBrokerConfig); // Inicialización sin credenciales
 
-// ... (El resto de tu código es igual)
+// --- Manejador para el login en el bróker (NUEVO) ---
+ipcMain.handle('login-broker', async (event, credentials) => {
+    logCallback("Intentando conectar con el bróker a través de Electron...");
+    
+    // Almacena las credenciales globalmente
+    userCredentials = credentials;
+    
+    brokerApi.setCredentials(userCredentials.email, userCredentials.password);
+    brokerApi.setLogCallback(logCallback);
 
-// --- Handlers para el bot de trading ---
+    try {
+        const isConnected = await brokerApi.connect();
+        if (isConnected) {
+            logCallback("Conexión con el bróker exitosa. ¡Listo para operar!");
+            return true;
+        }
+    } catch (error) {
+        logCallback(`❌ Error al conectar con el bróker: ${error.message}`);
+        return false;
+    }
+});
+
+// --- Manejador para iniciar el bot (MODIFICADO) ---
 ipcMain.handle('start-bot', async (event, tradingConfig) => {
     if (!tradingBot || !tradingBot.isRunning) {
-        logCallback("Intentando conectar con el bróker...");
-        brokerApi.setCredentials(userCredentials.email, userCredentials.password);
-        brokerApi.setLogCallback(logCallback);
-        
-        try {
-            const isConnected = await brokerApi.connect();
-            if (!isConnected) {
-                logCallback("No se pudo conectar al bróker. Deteniendo el inicio del bot.");
-                return false;
-            }
-        } catch (error) {
-            logCallback(`Error al conectar con el bróker: ${error.message}`);
+        // Asegúrate de que el usuario haya iniciado sesión primero
+        if (!userCredentials) {
+            logCallback("❌ Error: No se ha iniciado sesión en el bróker.");
             return false;
         }
+        
+        logCallback("Iniciando el bot...");
 
-        signalGenerator = new SignalGenerator(tradingConfig, brokerApi);
+        const signalGenerator = new SignalGenerator(tradingConfig, brokerApi);
         const initialSignals = await signalGenerator.generateSignals();
         
         tradingBot = new TradingBot(tradingConfig, brokerApi, initialSignals, logCallback, uiCallback);
@@ -46,6 +107,7 @@ ipcMain.handle('start-bot', async (event, tradingConfig) => {
     return false;
 });
 
+// --- Manejador para detener el bot (sin cambios) ---
 ipcMain.handle('stop-bot', async () => {
     if (tradingBot && tradingBot.isRunning) {
         logCallback("Deteniendo el bot...");
@@ -58,8 +120,7 @@ ipcMain.handle('stop-bot', async () => {
     return false;
 });
 
-// ... (El resto de tu código es igual)
-
+// --- Manejador para salir de la aplicación (sin cambios) ---
 ipcMain.handle('quit-app', () => {
     if (tradingBot && tradingBot.isRunning) {
         tradingBot.stop().finally(() => {
@@ -70,4 +131,13 @@ ipcMain.handle('quit-app', () => {
     }
 });
 
-// ... (El resto de tu código es igual)
+// --- Manejador para cambiar de ventana ---
+ipcMain.handle('show-bot', () => {
+    if (mainWindow) {
+        mainWindow.loadFile(path.join(__dirname, 'frontend', 'bot.html'));
+    }
+});
+
+ipcMain.handle('open-external-link', async (event, url) => {
+    shell.openExternal(url);
+});
