@@ -1,0 +1,34 @@
+{
+  "name": "esposo-trader-bot",
+  "version": "3.0.0",
+  "description": "Bot de Trading para IQ Option - Versión Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": ["trading", "bot", "iq-option", "electron"],
+  "author": "Esposo Trader",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^28.0.0",
+    "axios": "^1.6.0",
+    "ws": "^8.14.0",
+    "node-fetch": "^3.3.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.6.0"
+  },
+  "build": {
+    "appId": "com.esposotrader.bot",
+    "productName": "Esposo Trader Bot",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*"
+    ]
+  }
+}

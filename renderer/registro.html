@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Registro - Esposo Trader Bot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container registro-window">
+        <div class="frame">
+            <h3>Registro - Esposo Trader Bot v3.0.0</h3>
+            
+            <label>Regístrate con nuestros links:</label>
+            <br><br>
+            
+            <button onclick="abrirIQOption()">🔗 IQ Option</button>
+            <br>
+            <button onclick="abrirExnova()">🔗 Exnova</button>
+            
+            <br><br>
+            
+            <label for="correo">Correo electrónico:</label>
+            <input type="email" id="correo" placeholder="tu@email.com" style="width: 200px;">
+            
+            <br><br>
+            
+            <button onclick="confirmarRegistro()">✅ Confirmar Registro</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer, shell } = require('electron');
+
+        function abrirIQOption() {
+            shell.openExternal('https://affiliate.iqbroker.com/redir/?aff=378181&aff_model=revenue&afftrack=TUESPOSOTRADER');
+        }
+
+        function abrirExnova() {
+            shell.openExternal('https://exnova.com/lp/start-trading/?aff=378181&aff_model=revenue&afftrack=TUESPOSOTRADER');
+        }
+
+        async function confirmarRegistro() {
+            const correo = document.getElementById('correo').value.trim();
+            
+            if (!correo) {
+                alert('⚠️ Por favor ingresa tu correo electrónico');
+                return;
+            }
+
+            if (!correo.includes('@')) {
+                alert('⚠️ Por favor ingresa un correo válido');
+                return;
+            }
+
+            try {
+                await ipcRenderer.invoke('guardar-usuario', correo);
+                alert('✅ Registro exitoso! Ya puedes iniciar sesión.');
+                ipcRenderer.invoke('show-login');
+            } catch (error) {
+                alert('❌ Error al registrar: ' + error.message);
+            }
+        }
+
+        // Enter key support
+        document.getElementById('correo').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                confirmarRegistro();
+            }
+        });
+    </script>
+</body>
+</html>

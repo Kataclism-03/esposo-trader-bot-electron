@@ -1,0 +1,166 @@
+/* Estilo tkinter-like para Electron */
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 11px;
+    background-color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    background-color: #f0f0f0;
+    padding: 10px;
+}
+
+/* Botones estilo tkinter */
+button {
+    background-color: #e1e1e1;
+    border: 2px outset #e1e1e1;
+    padding: 6px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    margin: 5px 2px;
+    min-width: 75px;
+}
+
+button:hover {
+    background-color: #e8e8e8;
+}
+
+button:active {
+    border: 2px inset #e1e1e1;
+}
+
+button:disabled {
+    background-color: #d4d4d4;
+    color: #888;
+    cursor: default;
+    border: 2px outset #d4d4d4;
+}
+
+/* Entradas de texto estilo tkinter */
+input[type="text"], input[type="email"] {
+    border: 2px inset #e1e1e1;
+    padding: 4px;
+    font-size: 11px;
+    background-color: white;
+}
+
+input[type="text"]:focus, input[type="email"]:focus {
+    outline: none;
+    border: 2px inset #4a90e2;
+}
+
+/* Labels */
+label {
+    font-size: 11px;
+    display: block;
+    margin-bottom: 3px;
+}
+
+/* Listbox estilo tkinter */
+.listbox {
+    border: 2px inset #e1e1e1;
+    background-color: white;
+    font-family: monospace;
+    font-size: 10px;
+    padding: 2px;
+    overflow-y: scroll;
+    height: 150px;
+    width: 100%;
+    margin: 5px 0;
+}
+
+.listbox-item {
+    padding: 2px 4px;
+    cursor: default;
+    white-space: nowrap;
+}
+
+.listbox-item:hover {
+    background-color: #316ac5;
+    color: white;
+}
+
+/* Área de texto (log) estilo tkinter */
+.textbox {
+    border: 2px inset #e1e1e1;
+    background-color: white;
+    font-family: monospace;
+    font-size: 10px;
+    padding: 4px;
+    overflow-y: scroll;
+    height: 200px;
+    width: 100%;
+    margin: 5px 0;
+    resize: none;
+}
+
+/* Contenedores */
+.frame {
+    border: 2px groove #e1e1e1;
+    padding: 10px;
+    margin: 5px;
+    background-color: #f0f0f0;
+}
+
+.center {
+    text-align: center;
+}
+
+/* Specific window styles */
+.registro-window {
+    width: 380px;
+    text-align: center;
+}
+
+.login-window {
+    width: 280px;
+    text-align: center;
+}
+
+.bot-window {
+    width: 780px;
+}
+
+/* Status indicators */
+.status-connected {
+    color: green;
+    font-weight: bold;
+}
+
+.status-disconnected {
+    color: red;
+    font-weight: bold;
+}
+
+.status-warning {
+    color: orange;
+    font-weight: bold;
+}
+
+/* Links */
+a {
+    color: blue;
+    text-decoration: underline;
+}
+
+a:hover {
+    color: darkblue;
+}
+
+/* Progress indicator */
+.progress {
+    width: 100%;
+    height: 20px;
+    background-color: #f0f0f0;
+    border: 2px inset #e1e1e1;
+    margin: 5px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: #316ac5;
+    width: 0%;
+    transition: width 0.3s;
+}

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Esposo Trader Bot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container login-window">
+        <div class="frame">
+            <h3>Login - Esposo Trader Bot</h3>
+            
+            <label for="correo">Correo registrado:</label>
+            <input type="email" id="correo" placeholder="tu@email.com" style="width: 180px;">
+            
+            <br><br>
+            
+            <button onclick="validarLogin()">🔓 Ingresar</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer, shell } = require('electron');
+
+        async function validarLogin() {
+            const correo = document.getElementById('correo').value.trim();
+            
+            if (!correo) {
+                alert('⚠️ Por favor ingresa tu correo');
+                return;
+            }
+
+            try {
+                const esValido = await ipcRenderer.invoke('verificar-usuario', correo);
+                
+                if (esValido) {
+                    // Guardar el correo en localStorage para usarlo en el bot
+                    localStorage.setItem('usuario_correo', correo);
+                    ipcRenderer.invoke('show-bot');
+                } else {
+                    const respuesta = confirm('❌ No estás registrado con nuestro link.\n\n¿Quieres contactar con soporte técnico?');
+                    if (respuesta) {
+                        shell.openExternal('https://t.me/Tu_usuario_de_telegram');
+                    }
+                }
+            } catch (error) {
+                alert('❌ Error al validar: ' + error.message);
+            }
+        }
+
+        // Enter key support
+        document.getElementById('correo').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validarLogin();
+            }
+        });
+    </script>
+</body>
+</html>
