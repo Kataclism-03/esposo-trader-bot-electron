@@ -2,7 +2,10 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const config = require('./config/config');
-const TelegramService = require('./services/telegram');
+const TelegramService = require('./Servicios/telegram');
+const BrokerAPI = require('./Servicios/broker-api');
+const TradingBot = require('./Servicios/trading-bot');
+const SignalGenerator = require('./Servicios/signals');
 
 // --- CONFIGURACIÓN ---
 const USUARIOS_DB = path.join(__dirname, 'data', config.files.usersDatabase);
@@ -17,8 +20,13 @@ if (!fs.existsSync(dataDir)) {
 let mainWindow;
 let currentWindow = null;
 
+// --- Instancias de la lógica del bot ---
+let brokerApi = new BrokerAPI();
+let signalGenerator = null;
+let tradingBot = null;
+let userCredentials = { email: '', password: '' };
+
 function createWindow() {
-    // Verificar si existe el archivo de usuarios para determinar qué ventana abrir
     if (!fs.existsSync(USUARIOS_DB)) {
         showRegistroWindow();
     } else {
@@ -38,10 +46,10 @@ function showRegistroWindow() {
         },
         resizable: false,
         title: `Registro - ${config.app.name}`,
-        icon: path.join(__dirname, 'assets', 'icon.png') // Opcional
+        icon: path.join(__dirname, 'assets', 'icon.png')
     });
 
-    currentWindow.loadFile('renderer/registro.html');
+    currentWindow.loadFile('Rendedor/registro.html');
     
     currentWindow.on('closed', () => {
         currentWindow = null;
@@ -62,7 +70,7 @@ function showLoginWindow() {
         title: `Login - ${config.app.name}`
     });
 
-    currentWindow.loadFile('renderer/login.html');
+    currentWindow.loadFile('Rendedor/login.html');
     
     currentWindow.on('closed', () => {
         currentWindow = null;
@@ -85,14 +93,27 @@ function showBotWindow() {
         minHeight: 600
     });
 
-    currentWindow.loadFile('renderer/bot.html');
+    currentWindow.loadFile('Rendedor/bot.html');
     
     currentWindow.on('closed', () => {
         currentWindow = null;
     });
 }
 
-// IPC Handlers
+// --- Callbacks para el bot ---
+const logCallback = (message) => {
+    if (currentWindow) {
+        currentWindow.webContents.send('bot-log', message);
+    }
+};
+
+const uiCallback = (status) => {
+    if (currentWindow) {
+        currentWindow.webContents.send('bot-status-update', status);
+    }
+};
+
+// --- Handlers IPC ---
 ipcMain.handle('cargar-usuarios', () => {
     if (fs.existsSync(USUARIOS_DB)) {
         const data = fs.readFileSync(USUARIOS_DB, 'utf8');
@@ -113,21 +134,23 @@ ipcMain.handle('guardar-usuario', async (event, correo) => {
     
     fs.writeFileSync(USUARIOS_DB, JSON.stringify(usuarios, null, 2));
     
-    // Notificar a Telegram
     await TelegramService.notificarRegistro(correo);
     
     return true;
 });
 
-ipcMain.handle('verificar-usuario', async (event, correo) => {
+ipcMain.handle('verificar-usuario', async (event, correo, password) => {
     if (fs.existsSync(USUARIOS_DB)) {
         const usuarios = JSON.parse(fs.readFileSync(USUARIOS_DB, 'utf8'));
         const usuario = usuarios[correo];
         
         if (usuario) {
-            // Actualizar último login
             usuario.lastLogin = new Date().toISOString();
             fs.writeFileSync(USUARIOS_DB, JSON.stringify(usuarios, null, 2));
+            
+            userCredentials.email = correo;
+            userCredentials.password = password;
+            
             return true;
         }
     }
@@ -158,7 +181,47 @@ ipcMain.handle('show-bot', () => {
     showBotWindow();
 });
 
-// Handlers para el bot de trading
+// --- Handlers para el bot de trading ---
+ipcMain.handle('start-bot', async (event, tradingConfig) => {
+    if (!tradingBot || !tradingBot.isRunning) {
+        brokerApi.setCredentials(userCredentials.email, userCredentials.password);
+        brokerApi.setLogCallback(logCallback);
+        
+        signalGenerator = new SignalGenerator(tradingConfig, brokerApi);
+
+        const initialSignals = await signalGenerator.generateSignals();
+        
+        tradingBot = new TradingBot(tradingConfig, brokerApi, initialSignals, logCallback, uiCallback);
+        await tradingBot.start();
+        return true;
+    }
+    return false;
+});
+
+ipcMain.handle('stop-bot', async () => {
+    if (tradingBot && tradingBot.isRunning) {
+        await tradingBot.stop();
+        return true;
+    }
+    return false;
+});
+
+ipcMain.handle('get-bot-status', () => {
+    if (tradingBot) {
+        return { isRunning: tradingBot.isRunning };
+    }
+    return { isRunning: false };
+});
+
+ipcMain.handle('generate-signals', async (event, tradingConfig) => {
+    if (signalGenerator) {
+        signalGenerator.config = tradingConfig;
+        const signals = await signalGenerator.generateSignals();
+        return signals;
+    }
+    return [];
+});
+
 ipcMain.handle('get-trading-config', () => {
     return config.trading;
 });
@@ -167,9 +230,12 @@ ipcMain.handle('get-brokers-config', () => {
     return config.brokers;
 });
 
-// Handler para cerrar la aplicación
 ipcMain.handle('quit-app', () => {
-    app.quit();
+    if (tradingBot && tradingBot.isRunning) {
+        tradingBot.stop().finally(() => app.quit());
+    } else {
+        app.quit();
+    }
 });
 
 // Eventos de la aplicación
@@ -194,10 +260,15 @@ app.on('activate', () => {
 // Manejar errores no capturados
 process.on('uncaughtException', (error) => {
     console.error('Error no capturado:', error);
-    // Opcionalmente notificar por Telegram
+    if (currentWindow) {
+        currentWindow.webContents.send('bot-error', `Error crítico: ${error.message}`);
+    }
     TelegramService.notificarError(`Error crítico: ${error.message}`);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Promesa rechazada no manejada:', reason);
+    if (currentWindow) {
+        currentWindow.webContents.send('bot-error', `Error de promesa: ${reason}`);
+    }
 });
