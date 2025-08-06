@@ -59,10 +59,12 @@ class SignalGenerator {
             return null;
         }
 
+        // Se usa la enumeración del SDK: BlitzOptionsDirection.Call
         if (buffer1[len - 1] > buffer2[len - 1] && buffer1[len - 2] <= buffer2[len - 2]) {
             return BlitzOptionsDirection.Call;
         }
         
+        // Se usa la enumeración del SDK: BlitzOptionsDirection.Put
         if (buffer1[len - 1] < buffer2[len - 1] && buffer1[len - 2] >= buffer2[len - 2]) {
             return BlitzOptionsDirection.Put;
         }
@@ -72,7 +74,6 @@ class SignalGenerator {
 
     async generateSignals() {
         try {
-            // Se usa un nuevo método getCandles en BrokerAPI para interactuar con el SDK
             const candles = await this.brokerApi.getCandles(this.activo, this.tiempo, 200);
 
             if (!candles || candles.length === 0) {
