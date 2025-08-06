@@ -6,7 +6,8 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #2c3e50; /* Azul marino */
+            background-color: #e0eafc; /* Degradado de azul claro a azul oscuro */
+            background-image: linear-gradient(to top, #cfd9df 0%, #e2ebf0 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -15,53 +16,60 @@
         }
         .container {
             background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             overflow: hidden;
-            width: 350px;
-            padding: 30px;
+            width: 380px;
+            padding: 40px;
             text-align: center;
+            box-sizing: border-box;
         }
         .frame {
-            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
         h3 {
             color: #34495e;
-            margin-bottom: 25px;
+            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
         }
         label {
-            display: block;
-            margin-bottom: 8px;
-            color: #7f8c8d;
-            text-align: left;
+            display: none; /* Ocultamos las etiquetas para un diseño más limpio */
         }
         input {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #d3d3d3;
-            border-radius: 5px;
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dcdcdc;
+            border-radius: 8px;
             box-sizing: border-box;
             font-size: 16px;
+            transition: all 0.3s ease;
         }
         input:focus {
             outline: none;
-            border-color: #3498db;
-            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+            border-color: #5a77a9;
+            box-shadow: 0 0 8px rgba(90, 119, 169, 0.2);
         }
         button {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             border: none;
-            border-radius: 5px;
-            background-color: #3498db;
+            border-radius: 8px;
+            background-color: #5a77a9;
             color: #fff;
             cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
+            font-size: 18px;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
         }
         button:hover {
-            background-color: #2980b9;
+            background-color: #4a638b;
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
         }
     </style>
 </head>
@@ -70,13 +78,10 @@
         <div class="frame">
             <h3>Login - Esposo Trader Bot</h3>
             
-            <label for="correo">Correo:</label>
-            <input type="email" id="correo" placeholder="tu@email.com">
+            <input type="email" id="correo" placeholder="Correo">
+            <input type="password" id="contrasena" placeholder="Contraseña">
             
-            <label for="contrasena">Contraseña:</label>
-            <input type="password" id="contrasena" placeholder="tu-contraseña">
-            
-            <button onclick="iniciarSesion()">🔓 Ingresar</button>
+            <button onclick="iniciarSesion()">Ingresar</button>
         </div>
     </div>
 
@@ -93,7 +98,6 @@
             }
 
             try {
-                // Paso 1: Intentar el login en el bróker
                 const userId = await ipcRenderer.invoke('login-broker', { email: correo, password: contrasena });
                 
                 if (!userId) {
@@ -101,7 +105,6 @@
                     return;
                 }
 
-                // Paso 2: Verificar si el ID del usuario está en la lista de afiliados
                 const esAfiliado = await ipcRenderer.invoke('check-affiliate-by-id', userId);
 
                 if (!esAfiliado) {
@@ -112,7 +115,6 @@
                     return;
                 }
 
-                // Si ambos pasos son exitosos, muestra la ventana del bot
                 ipcRenderer.invoke('show-bot');
 
             } catch (error) {
