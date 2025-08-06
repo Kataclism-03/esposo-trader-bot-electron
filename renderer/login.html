@@ -1,59 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Login - Esposo Trader Bot</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <title>Login - Esposo Trader Bot</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container login-window">
-        <div class="frame">
-            <h3>Login - Esposo Trader Bot</h3>
-            
-            <label for="correo">Correo registrado:</label>
-            <input type="email" id="correo" placeholder="tu@email.com" style="width: 180px;">
-            
-            <br><br>
-            
-            <button onclick="validarLogin()">🔓 Ingresar</button>
-        </div>
-    </div>
+    <div class="container login-window">
+        <div class="frame">
+            <h3>Login - Esposo Trader Bot</h3>
+            
+            <label for="correo">Correo:</label>
+            <input type="email" id="correo" placeholder="tu@email.com" style="width: 180px;">
+            
+            <br><br>
 
-    <script>
-        const { ipcRenderer, shell } = require('electron');
+            <label for="contrasena">Contraseña:</label>
+            <input type="password" id="contrasena" placeholder="tu-contraseña" style="width: 180px;">
+            
+            <br><br>
+            
+            <button onclick="iniciarSesion()">🔓 Ingresar</button>
+        </div>
+    </div>
 
-        async function validarLogin() {
-            const correo = document.getElementById('correo').value.trim();
-            
-            if (!correo) {
-                alert('⚠️ Por favor ingresa tu correo');
-                return;
-            }
+    <script>
+        // Imul-ul-ul-ulay tayo ti IPC a panangilako para iti maysa a browser.
+        // Ti orihinal a `require('electron')` ket awan ditoy.
+        // Simulado tayo ti maysa a nagballigi a panag-login a kadua ti naireseta a kredensial para iti panangipakaammo.
 
-            try {
-                const esValido = await ipcRenderer.invoke('verificar-usuario', correo);
+        async function iniciarSesion() {
+            // Alaem dagiti dua nga input
+            const correo = document.getElementById('correo').value.trim();
+            const contrasena = document.getElementById('contrasena').value.trim();
+            
+            if (!correo || !contrasena) {
+                alert('⚠️ Pangaasim, ikabilmo ti emailmo ken passwordmo');
+                return;
+            }
+
+            try {
+                // Simulado tayo ti asynchronous a panawag para iti login
+                // Iti maysa a browser app, daytoy ket maysa a fetch() a panawag iti maysa a backend API.
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Naireseta a kredensial para iti daytoy a browser.
+                // Iti maysa a pudno nga aplikasion, daytoy ket maysa a panagkita kadagiti sungbat ti API.
+                const isLoggedIn = (correo === 'test@example.com' && contrasena === 'password');
                 
-                if (esValido) {
-                    // Guardar el correo en localStorage para usarlo en el bot
-                    localStorage.setItem('usuario_correo', correo);
-                    ipcRenderer.invoke('show-bot');
-                } else {
-                    const respuesta = confirm('❌ No estás registrado con nuestro link.\n\n¿Quieres contactar con soporte técnico?');
-                    if (respuesta) {
-                        shell.openExternal('https://t.me/Tu_usuario_de_telegram');
-                    }
-                }
-            } catch (error) {
-                alert('❌ Error al validar: ' + error.message);
-            }
-        }
+                if (isLoggedIn) {
+                    // No nagballigi ti login, ibalbaliw ti bintana ti bot
+                    alert('✅ Login successful! Redirecting to bot page.');
+                } else {
+                    // No saan a nagballigi, ipakaammo ti error
+                    alert('❌ Error ti koneksion wenno di umiso a kredensial. Pangaasim, kitaem ti datam ken panunotem manen.');
+                }
+            } catch (error) {
+                alert('❌ Nagkama ti di ninamnama nga error bayat ti login: ' + error.message);
+            }
+        }
 
-        // Enter key support
-        document.getElementById('correo').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                validarLogin();
-            }
-        });
-    </script>
+        // Panangsuporta iti Enter key
+        document.getElementById('correo').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                iniciarSesion();
+            }
+        });
+        document.getElementById('contrasena').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                iniciarSesion();
+            }
+        });
+    </script>
 </body>
 </html>
