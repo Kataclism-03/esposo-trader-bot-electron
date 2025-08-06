@@ -10,7 +10,6 @@
         <div class="frame">
             <h3>Esposo Trader Bot v3.0.0 - Usuario: <span id="usuario-actual"></span></h3>
             
-            <!-- Configuración del Broker -->
             <div class="frame">
                 <label>Seleccionar Broker:</label>
                 <br>
@@ -24,11 +23,10 @@
                 <label>Estado de Conexión: <span id="estado-conexion" class="status-disconnected">Desconectado</span></label>
                 <br><br>
                 
-                <button onclick="conectarBroker()">🔌 Conectar a Broker</button>
-                <button onclick="desconectarBroker()">🔌 Desconectar</button>
+                <button onclick="conectarBroker()" id="btn-conectar">🔌 Conectar a Broker</button>
+                <button onclick="desconectarBroker()" id="btn-desconectar" disabled>🔌 Desconectar</button>
             </div>
 
-            <!-- Configuración de Trading -->
             <div class="frame">
                 <h4>Configuración de Trading</h4>
                 <table>
@@ -65,14 +63,12 @@
                 </table>
             </div>
 
-            <!-- Botones Principales -->
             <div class="frame center">
-                <button onclick="generarSenales()" id="btn-generar">📊 Generar Señales</button>
-                <button onclick="iniciarBot()" id="btn-iniciar">🚀 Iniciar Bot</button>
-                <button onclick="detenerBot()" id="btn-detener">⏹️ Detener Bot</button>
+                <button onclick="generarSenales()" id="btn-generar" disabled>📊 Generar Señales</button>
+                <button onclick="iniciarBot()" id="btn-iniciar" disabled>🚀 Iniciar Bot</button>
+                <button onclick="detenerBot()" id="btn-detener" disabled>⏹️ Detener Bot</button>
             </div>
 
-            <!-- Señales Generadas -->
             <div class="frame">
                 <label>Señales Generadas:</label>
                 <div class="listbox" id="senales-listbox">
@@ -82,14 +78,12 @@
                 </div>
             </div>
 
-            <!-- Log del Sistema -->
             <div class="frame">
                 <label>Log del Sistema:</label>
                 <textarea class="textbox" id="log-area" readonly></textarea>
                 <button onclick="limpiarLog()">🗑️ Limpiar Log</button>
             </div>
 
-            <!-- Estado del Bot -->
             <div class="frame">
                 <table style="width: 100%;">
                     <tr>
@@ -111,14 +105,19 @@
 
     <script>
         const { ipcRenderer } = require('electron');
-        const TradingBot = require('../services/trading-bot');
-        const SignalGenerator = require('../services/signals');
 
-        let bot = null;
-        let signals = [];
-        let isConnected = false;
+        ipcRenderer.on('bot-log', (event, message) => {
+            log(message);
+        });
 
-        // Cargar usuario actual
+        ipcRenderer.on('bot-status-update', (event, data) => {
+            updateUI(data);
+        });
+
+        ipcRenderer.on('bot-error', (event, message) => {
+            log(`ERROR: ${message}`);
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             const usuario = localStorage.getItem('usuario_correo');
             document.getElementById('usuario-actual').textContent = usuario || 'Desconocido';
@@ -150,58 +149,62 @@
                 signalPeriod: parseInt(document.getElementById('signal-period').value)
             };
         }
+        
+        function setButtonsState(state) {
+            const isConnected = state === 'connected';
+            const isRunning = state === 'running';
+
+            document.getElementById('btn-conectar').disabled = isConnected || isRunning;
+            document.getElementById('btn-desconectar').disabled = !isConnected && !isRunning;
+            document.getElementById('btn-generar').disabled = !isConnected || isRunning;
+            document.getElementById('btn-iniciar').disabled = !isConnected || isRunning;
+            document.getElementById('btn-detener').disabled = !isRunning;
+        }
 
         async function conectarBroker() {
             const config = getConfiguracion();
             log(`Conectando a ${config.broker.toUpperCase()}...`);
+            setButtonsState('connecting');
             
             try {
-                // Simular conexión (aquí implementarías la conexión real)
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                isConnected = true;
-                document.getElementById('estado-conexion').textContent = 'Conectado';
-                document.getElementById('estado-conexion').className = 'status-connected';
-                document.getElementById('balance-inicial').textContent = '$1000.00';
-                document.getElementById('balance-actual').textContent = '$1000.00';
-                
-                log(`✅ Conectado exitosamente a ${config.broker.toUpperCase()}`);
+                const result = await ipcRenderer.invoke('start-bot', config);
+                if (result) {
+                    document.getElementById('estado-conexion').textContent = 'Conectado';
+                    document.getElementById('estado-conexion').className = 'status-connected';
+                    setButtonsState('connected');
+                } else {
+                    document.getElementById('estado-conexion').textContent = 'Desconectado';
+                    document.getElementById('estado-conexion').className = 'status-disconnected';
+                    setButtonsState('disconnected');
+                }
             } catch (error) {
                 log(`❌ Error de conexión: ${error.message}`);
+                setButtonsState('disconnected');
             }
         }
 
         async function desconectarBroker() {
-            if (bot) {
-                await detenerBot();
-            }
-            
-            isConnected = false;
+            log('🔌 Desconectando del broker...');
+            await ipcRenderer.invoke('stop-bot');
             document.getElementById('estado-conexion').textContent = 'Desconectado';
             document.getElementById('estado-conexion').className = 'status-disconnected';
-            log('🔌 Desconectado del broker');
+            setButtonsState('disconnected');
+            log('🔌 Desconectado del broker.');
         }
 
         async function generarSenales() {
-            if (!isConnected) {
-                alert('⚠️ Primero debes conectarte al broker');
-                return;
-            }
-
             const config = getConfiguracion();
             log('📊 Generando señales... Esto puede tardar unos segundos.');
-            
-            document.getElementById('btn-generar').disabled = true;
+            setButtonsState('generating');
             
             try {
-                const generator = new SignalGenerator(config);
-                signals = await generator.generateSignals();
+                const signals = await ipcRenderer.invoke('generate-signals', config);
                 
                 const listbox = document.getElementById('senales-listbox');
                 listbox.innerHTML = '';
                 
                 if (signals.length === 0) {
-                    listbox.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">No se generaron señales para los próximos períodos</div>';
+                    listbox.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">No se generaron señales</div>';
                 } else {
                     signals.forEach(signal => {
                         const div = document.createElement('div');
@@ -212,52 +215,31 @@
                 }
                 
                 log(`✅ Generación completada. ${signals.length} señales encontradas.`);
+                setButtonsState('connected');
             } catch (error) {
                 log(`❌ Error al generar señales: ${error.message}`);
-            } finally {
-                document.getElementById('btn-generar').disabled = false;
+                setButtonsState('connected');
             }
         }
 
         async function iniciarBot() {
-            if (!isConnected) {
-                alert('⚠️ Primero debes conectarte al broker');
-                return;
-            }
-
-            if (signals.length === 0) {
-                alert('⚠️ Primero debes generar señales');
-                return;
-            }
-
             const config = getConfiguracion();
             log('🚀 Iniciando bot de trading...');
+            setButtonsState('running');
             
             try {
-                bot = new TradingBot(config, signals, log, updateUI);
-                await bot.start();
-                
-                document.getElementById('btn-iniciar').disabled = true;
-                document.getElementById('btn-detener').disabled = false;
-                document.getElementById('btn-generar').disabled = true;
-                
                 log('✅ Bot iniciado correctamente');
             } catch (error) {
                 log(`❌ Error al iniciar bot: ${error.message}`);
+                setButtonsState('connected');
             }
         }
 
         async function detenerBot() {
-            if (bot) {
-                await bot.stop();
-                bot = null;
-                
-                document.getElementById('btn-iniciar').disabled = false;
-                document.getElementById('btn-detener').disabled = true;
-                document.getElementById('btn-generar').disabled = false;
-                
-                log('⏹️ Bot detenido');
-            }
+            log('⏹️ Deteniendo bot de trading...');
+            await ipcRenderer.invoke('stop-bot');
+            setButtonsState('connected');
+            log('⏹️ Bot detenido');
         }
 
         function updateUI(data) {
@@ -271,9 +253,6 @@
                 document.getElementById('perdidas-consecutivas').textContent = data.perdidasConsecutivas;
             }
         }
-
-        // Deshabilitar botones inicialmente
-        document.getElementById('btn-detener').disabled = true;
     </script>
 </body>
 </html>
