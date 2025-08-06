@@ -2,184 +2,90 @@
 
 const TelegramService = require('./telegram');
 const BrokerAPI = require('./broker-api');
-const { BalanceType, BlitzOptionsDirection, BlitzOption } = require('@tradecodehub/client-sdk-js');
+const { BalanceType, BlitzOptionsDirection } = require('@tradecodehub/client-sdk-js');
 
 class TradingBot {
-    constructor(config, brokerApi, signals, logCallback, uiCallback) {
-        this.config = config;
-        this.brokerApi = brokerApi;
-        this.signals = [...signals];
-        this.logCallback = logCallback;
-        this.uiCallback = uiCallback;
-        
-        this.isRunning = false;
-        this.perdidasConsecutivas = 0;
-        this.montoActual = config.montoInicial;
-        
-        this.maxPerdidasConsecutivas = 3;
-        
-        this.balanceInicial = 0;
-        this.balanceActual = 0;
-        this.totalOperaciones = 0;
+    constructor(config, brokerApi, signals, logCallback, uiCallback) {
+        this.config = config;
+        this.brokerApi = brokerApi;
+        this.signals = [...signals];
+        this.logCallback = logCallback;
+        this.uiCallback = uiCallback;
+        
+        this.isRunning = false;
+        this.perdidasConsecutivas = 0;
+        this.montoActual = config.montoInicial;
+        
+        this.maxPerdidasConsecutivas = 3;
+        
+        this.balanceInicial = 0;
+        this.balanceActual = 0;
+        this.totalOperaciones = 0;
 
-        this.logCallback('🤖 Bot de trading inicializado');
-    }
+        this.logCallback('🤖 Bot de trading inicializado');
+    }
 
-    async start() {
-        if (this.isRunning) {
-            throw new Error('El bot ya está ejecutándose');
-        }
+    async start() {
+        if (this.isRunning) {
+            throw new Error('El bot ya está ejecutándose');
+        }
 
-        this.logCallback('🚀 Iniciando bot de trading...');
-        
-        const balances = await this.brokerApi.getBalances();
-        const balance = balances.find(b => b.type === BalanceType.Real);
+        this.logCallback('🚀 Iniciando bot de trading...');
+        
+        const balances = await this.brokerApi.getBalances();
+        const balance = balances.find(b => b.type === BalanceType.Real);
 
-        if (!balance) {
-            this.logCallback('❌ No se encontró un saldo real para operar. Bot detenido.');
-            return;
-        }
+        if (!balance) {
+            this.logCallback('❌ No se encontró un saldo real para operar. Bot detenido.');
+            return;
+        }
 
-        this.balanceInicial = balance.amount;
-        this.balanceActual = this.balanceInicial;
+        this.balanceInicial = balance.amount;
+        this.balanceActual = this.balanceInicial;
 
-        this.isRunning = true;
+        this.isRunning = true;
 
-        this.uiCallback({
-            balance: this.balanceActual,
-            operaciones: this.totalOperaciones,
-            perdidasConsecutivas: this.perdidasConsecutivas
-        });
-        
-        this.mainLoop();
-    }
+        this.uiCallback({
+            balance: this.balanceActual,
+            operaciones: this.totalOperaciones,
+            perdidasConsecutivas: this.perdidasConsecutivas
+        });
+        
+        this.mainLoop();
+    }
 
-    async stop() {
-        this.isRunning = false;
-        this.logCallback('⏹️ Deteniendo bot de trading...');
-    }
+    async stop() {
+        this.isRunning = false;
+        this.logCallback('⏹️ Deteniendo bot de trading...');
+    }
 
-    mainLoop() {
-        if (!this.isRunning) return;
+    mainLoop() {
+        if (!this.isRunning) return;
 
-        if (this.verificarStopLoss()) return;
-        if (this.verificarTakeProfit()) return;
-        if (this.verificarLimitePerdidasConsecutivas()) return;
+        if (this.verificarStopLoss()) return;
+        if (this.verificarTakeProfit()) return;
+        if (this.verificarLimitePerdidasConsecutivas()) return;
 
-        const ahora = Date.now();
-        const senalesToExecute = this.signals.filter(signal => {
-            const tiempoEjecucion = signal.time;
-            const diferencia = Math.abs(tiempoEjecucion - ahora);
-            return diferencia <= (this.config.tiempo * 60 * 1000 * 0.1); 
-        });
+        const ahora = Date.now();
+        const senalesToExecute = this.signals.filter(signal => {
+            const tiempoEjecucion = signal.time;
+            const diferencia = Math.abs(tiempoEjecucion - ahora);
+            return diferencia <= (this.config.tiempo * 60 * 1000 * 0.1); 
+        });
 
-        senalesToExecute.forEach(signal => {
-            this.ejecutarOperacion(signal);
-            const index = this.signals.indexOf(signal);
-            if (index > -1) {
-                this.signals.splice(index, 1);
-            }
-        });
+        senalesToExecute.forEach(signal => {
+            this.ejecutarOperacion(signal);
+            const index = this.signals.indexOf(signal);
+            if (index > -1) {
+                this.signals.splice(index, 1);
+            }
+        });
 
-        if (this.isRunning) {
-            setTimeout(() => this.mainLoop(), 1000);
-        }
-    }
+        if (this.isRunning) {
+            setTimeout(() => this.mainLoop(), 1000);
+        }
+    }
 
-    verificarStopLoss() {
-        if (this.balanceActual <= this.balanceInicial - this.config.stopLoss) {
-            const perdida = this.balanceInicial - this.balanceActual;
-            this.logCallback(`⛔️ Stop-Loss alcanzado. Bot detenido. Pérdida: $${perdida.toFixed(2)}`);
-            TelegramService.notificarStopLoss(perdida, this.balanceInicial, this.balanceActual);
-            this.isRunning = false;
-            return true;
-        }
-        return false;
-    }
-
-    verificarTakeProfit() {
-        if (this.balanceActual >= this.balanceInicial + this.config.takeProfit) {
-            const ganancia = this.balanceActual - this.balanceInicial;
-            this.logCallback(`✅ Take-Profit alcanzado. Bot detenido. Ganancia: $${ganancia.toFixed(2)}`);
-            TelegramService.notificarTakeProfit(ganancia, this.balanceInicial, this.balanceActual);
-            this.isRunning = false;
-            return true;
-        }
-        return false;
-    }
-
-    verificarLimitePerdidasConsecutivas() {
-        if (this.perdidasConsecutivas >= this.maxPerdidasConsecutivas) {
-            this.logCallback(`❌ Límite de ${this.maxPerdidasConsecutivas} pérdidas consecutivas alcanzado. Bot detenido.`);
-            TelegramService.notificarLimitePerdidasConsecutivas(this.perdidasConsecutivas);
-            this.isRunning = false;
-            return true;
-        }
-        return false;
-    }
-
-    calcularMontoOperacion() {
-        if (this.config.martingalaActiva && this.perdidasConsecutivas > 0) {
-            this.montoActual = this.config.montoInicial * Math.pow(2, this.perdidasConsecutivas);
-        } else {
-            this.montoActual = this.config.montoInicial;
-        }
-
-        if (this.montoActual > this.balanceActual) {
-            this.logCallback('⚠️ Capital insuficiente. Reiniciando monto de martingala.');
-            this.montoActual = this.config.montoInicial;
-            this.perdidasConsecutivas = 0;
-        }
-
-        return this.montoActual;
-    }
-
-    async ejecutarOperacion(signal) {
-        const monto = this.calcularMontoOperacion();
-        
-        try {
-            this.logCallback(`📈 Ejecutando operación ${signal.direction.toUpperCase()} en ${signal.activo} con $${monto.toFixed(2)}`);
-            
-            const option = await this.brokerApi.buyBlitzOption(signal.activo, signal.direction, monto);
-            
-            if (!option) {
-                this.logCallback("❗ La operación no se pudo ejecutar.");
-                return;
-            }
-
-            this.totalOperaciones++;
-            
-            const winResult = option.win ? 'win' : 'loss'; 
-
-            this.balanceActual = await this.brokerApi.getBalances()
-                .then(balances => balances.find(b => b.type === BalanceType.Real).amount);
-
-            if (winResult === 'win') {
-                this.perdidasConsecutivas = 0;
-                const ganancia = (monto * 0.8);
-                this.logCallback(`✅ Operación ganadora! Ganancia: $${ganancia.toFixed(2)} | Balance: $${this.balanceActual.toFixed(2)}`);
-                TelegramService.notificarOperacion('win', ganancia, monto, this.balanceActual);
-            } else if (winResult === 'loss') {
-                this.perdidasConsecutivas++;
-                const perdida = monto;
-                this.logCallback(`❌ Operación perdedora. Pérdida: $${perdida.toFixed(2)} | Balance: $${this.balanceActual.toFixed(2)} | Pérdidas consecutivas: ${this.perdidasConsecutivas}`);
-                TelegramService.notificarOperacion('loss', -perdida, monto, this.balanceActual);
-            } else {
-                this.logCallback(`➖ Operación empatada. Balance: $${this.balanceActual.toFixed(2)}`);
-                TelegramService.notificarOperacion('equal', 0, monto, this.balanceActual);
-            }
-            
-            this.uiCallback({
-                balance: this.balanceActual,
-                operaciones: this.totalOperaciones,
-                perdidasConsecutivas: this.perdidasConsecutivas
-            });
-            
-        } catch (error) {
-            this.logCallback(`❗ Error al ejecutar operación: ${error.message}`);
-            TelegramService.notificarError(`Error en operación: ${error.message}`);
-        }
-    }
-}
-
-module.exports = TradingBot;
+    verificarStopLoss() {
+        if (this.balanceActual <= this.balanceInicial - this.config.stopLoss) {
+            const perdida = this
