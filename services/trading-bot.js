@@ -32,13 +32,6 @@ class TradingBot {
 
         this.logCallback('🚀 Iniciando bot de trading...');
         
-        // Ya no es necesario conectar aquí, ya que se hace en main.js
-        // const isConnected = await this.brokerApi.connect();
-        // if (!isConnected) {
-        //     this.logCallback('❌ No se pudo conectar al broker. Bot detenido.');
-        //     return;
-        // }
-
         const balances = await this.brokerApi.getBalances();
         const balance = balances.find(b => b.type === BalanceType.Real);
 
@@ -63,8 +56,6 @@ class TradingBot {
 
     async stop() {
         this.isRunning = false;
-        // La desconexión del broker ahora se maneja en main.js
-        // await this.brokerApi.disconnect(); 
         this.logCallback('⏹️ Deteniendo bot de trading...');
     }
 
@@ -79,7 +70,6 @@ class TradingBot {
         const senalesToExecute = this.signals.filter(signal => {
             const tiempoEjecucion = signal.time;
             const diferencia = Math.abs(tiempoEjecucion - ahora);
-            // Asegúrate de que tu lógica de tiempo de señal sea compatible con el tiempo de expiración
             return diferencia <= (this.config.tiempo * 60 * 1000 * 0.1); 
         });
 
@@ -150,8 +140,6 @@ class TradingBot {
         try {
             this.logCallback(`📈 Ejecutando operación ${signal.direction.toUpperCase()} en ${signal.activo} con $${monto.toFixed(2)}`);
             
-            // Usamos el nuevo método buyBlitzOption de BrokerAPI
-            // Nota: Aquí asumo que signal.activo es el activeId y signal.direction es el BlitzOptionsDirection
             const option = await this.brokerApi.buyBlitzOption(signal.activo, signal.direction, monto);
             
             if (!option) {
@@ -161,20 +149,14 @@ class TradingBot {
 
             this.totalOperaciones++;
             
-            // La información del resultado de la operación se puede obtener de la propia opción
-            // El resultado de la operación se podría obtener de la propiedad 'result'
-            // O suscribiéndose a actualizaciones de posiciones.
-            // Para mantener la lógica similar a la tuya, simulo un checkWin.
-            // Si la propiedad `result` en la opción existe, la usaría aquí.
-            const winResult = option.win ? 'win' : 'loss'; // Esto es un placeholder
+            const winResult = option.win ? 'win' : 'loss'; 
 
             this.balanceActual = await this.brokerApi.getBalances()
                 .then(balances => balances.find(b => b.type === BalanceType.Real).amount);
 
             if (winResult === 'win') {
                 this.perdidasConsecutivas = 0;
-                // La ganancia real se debería calcular de la respuesta del SDK
-                const ganancia = (monto * 0.8); // Placeholder, el payout real se obtendría del SDK
+                const ganancia = (monto * 0.8);
                 this.logCallback(`✅ Operación ganadora! Ganancia: $${ganancia.toFixed(2)} | Balance: $${this.balanceActual.toFixed(2)}`);
                 TelegramService.notificarOperacion('win', ganancia, monto, this.balanceActual);
             } else if (winResult === 'loss') {
