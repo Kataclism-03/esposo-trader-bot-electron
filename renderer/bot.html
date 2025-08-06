@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Esposo Trader Bot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container bot-window">
+        <div class="frame">
+            <h3>Esposo Trader Bot v3.0.0 - Usuario: <span id="usuario-actual"></span></h3>
+            
+            <!-- Configuración del Broker -->
+            <div class="frame">
+                <label>Seleccionar Broker:</label>
+                <br>
+                <input type="radio" id="iq-option" name="broker" value="iqoption" checked>
+                <label for="iq-option">IQ Option</label>
+                &nbsp;&nbsp;
+                <input type="radio" id="exnova" name="broker" value="exnova">
+                <label for="exnova">Exnova</label>
+                <br><br>
+                
+                <label>Estado de Conexión: <span id="estado-conexion" class="status-disconnected">Desconectado</span></label>
+                <br><br>
+                
+                <button onclick="conectarBroker()">🔌 Conectar a Broker</button>
+                <button onclick="desconectarBroker()">🔌 Desconectar</button>
+            </div>
+
+            <!-- Configuración de Trading -->
+            <div class="frame">
+                <h4>Configuración de Trading</h4>
+                <table>
+                    <tr>
+                        <td><label for="activo">Activo:</label></td>
+                        <td><input type="text" id="activo" value="EURUSD" style="width: 80px;"></td>
+                        <td><label for="tiempo">Tiempo (min):</label></td>
+                        <td><input type="number" id="tiempo" value="5" min="1" max="60" style="width: 50px;"></td>
+                    </tr>
+                    <tr>
+                        <td><label for="monto">Monto Inicial:</label></td>
+                        <td><input type="number" id="monto" value="1.0" min="0.1" step="0.1" style="width: 80px;"></td>
+                        <td><label for="martingala">Martingala:</label></td>
+                        <td><input type="checkbox" id="martingala" checked></td>
+                    </tr>
+                    <tr>
+                        <td><label for="stop-loss">Stop Loss:</label></td>
+                        <td><input type="number" id="stop-loss" value="10.0" min="1" step="0.1" style="width: 80px;"></td>
+                        <td><label for="take-profit">Take Profit:</label></td>
+                        <td><input type="number" id="take-profit" value="5.0" min="1" step="0.1" style="width: 80px;"></td>
+                    </tr>
+                </table>
+                
+                <h5>Configuración de Indicadores</h5>
+                <table>
+                    <tr>
+                        <td><label for="ma-fast">MA Rápida:</label></td>
+                        <td><input type="number" id="ma-fast" value="5" min="1" style="width: 50px;"></td>
+                        <td><label for="ma-slow">MA Lenta:</label></td>
+                        <td><input type="number" id="ma-slow" value="34" min="1" style="width: 50px;"></td>
+                        <td><label for="signal-period">Período Señal:</label></td>
+                        <td><input type="number" id="signal-period" value="5" min="1" style="width: 50px;"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Botones Principales -->
+            <div class="frame center">
+                <button onclick="generarSenales()" id="btn-generar">📊 Generar Señales</button>
+                <button onclick="iniciarBot()" id="btn-iniciar">🚀 Iniciar Bot</button>
+                <button onclick="detenerBot()" id="btn-detener">⏹️ Detener Bot</button>
+            </div>
+
+            <!-- Señales Generadas -->
+            <div class="frame">
+                <label>Señales Generadas:</label>
+                <div class="listbox" id="senales-listbox">
+                    <div style="color: #888; text-align: center; padding: 20px;">
+                        No hay señales generadas. Haz clic en "Generar Señales"
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log del Sistema -->
+            <div class="frame">
+                <label>Log del Sistema:</label>
+                <textarea class="textbox" id="log-area" readonly></textarea>
+                <button onclick="limpiarLog()">🗑️ Limpiar Log</button>
+            </div>
+
+            <!-- Estado del Bot -->
+            <div class="frame">
+                <table style="width: 100%;">
+                    <tr>
+                        <td><label>Balance Inicial:</label></td>
+                        <td><span id="balance-inicial">$0.00</span></td>
+                        <td><label>Balance Actual:</label></td>
+                        <td><span id="balance-actual">$0.00</span></td>
+                    </tr>
+                    <tr>
+                        <td><label>Operaciones:</label></td>
+                        <td><span id="total-operaciones">0</span></td>
+                        <td><label>Pérdidas Consecutivas:</label></td>
+                        <td><span id="perdidas-consecutivas">0</span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const TradingBot = require('../services/trading-bot');
+        const SignalGenerator = require('../services/signals');
+
+        let bot = null;
+        let signals = [];
+        let isConnected = false;
+
+        // Cargar usuario actual
+        document.addEventListener('DOMContentLoaded', () => {
+            const usuario = localStorage.getItem('usuario_correo');
+            document.getElementById('usuario-actual').textContent = usuario || 'Desconocido';
+            log('Sistema iniciado. Bienvenido!');
+        });
+
+        function log(mensaje) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logArea = document.getElementById('log-area');
+            logArea.value += `[${timestamp}] ${mensaje}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function limpiarLog() {
+            document.getElementById('log-area').value = '';
+        }
+
+        function getConfiguracion() {
+            return {
+                broker: document.querySelector('input[name="broker"]:checked').value,
+                activo: document.getElementById('activo').value,
+                tiempo: parseInt(document.getElementById('tiempo').value),
+                montoInicial: parseFloat(document.getElementById('monto').value),
+                martingalaActiva: document.getElementById('martingala').checked,
+                stopLoss: parseFloat(document.getElementById('stop-loss').value),
+                takeProfit: parseFloat(document.getElementById('take-profit').value),
+                maFast: parseInt(document.getElementById('ma-fast').value),
+                maSlow: parseInt(document.getElementById('ma-slow').value),
+                signalPeriod: parseInt(document.getElementById('signal-period').value)
+            };
+        }
+
+        async function conectarBroker() {
+            const config = getConfiguracion();
+            log(`Conectando a ${config.broker.toUpperCase()}...`);
+            
+            try {
+                // Simular conexión (aquí implementarías la conexión real)
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                isConnected = true;
+                document.getElementById('estado-conexion').textContent = 'Conectado';
+                document.getElementById('estado-conexion').className = 'status-connected';
+                document.getElementById('balance-inicial').textContent = '$1000.00';
+                document.getElementById('balance-actual').textContent = '$1000.00';
+                
+                log(`✅ Conectado exitosamente a ${config.broker.toUpperCase()}`);
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`);
+            }
+        }
+
+        async function desconectarBroker() {
+            if (bot) {
+                await detenerBot();
+            }
+            
+            isConnected = false;
+            document.getElementById('estado-conexion').textContent = 'Desconectado';
+            document.getElementById('estado-conexion').className = 'status-disconnected';
+            log('🔌 Desconectado del broker');
+        }
+
+        async function generarSenales() {
+            if (!isConnected) {
+                alert('⚠️ Primero debes conectarte al broker');
+                return;
+            }
+
+            const config = getConfiguracion();
+            log('📊 Generando señales... Esto puede tardar unos segundos.');
+            
+            document.getElementById('btn-generar').disabled = true;
+            
+            try {
+                const generator = new SignalGenerator(config);
+                signals = await generator.generateSignals();
+                
+                const listbox = document.getElementById('senales-listbox');
+                listbox.innerHTML = '';
+                
+                if (signals.length === 0) {
+                    listbox.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">No se generaron señales para los próximos períodos</div>';
+                } else {
+                    signals.forEach(signal => {
+                        const div = document.createElement('div');
+                        div.className = 'listbox-item';
+                        div.textContent = `${signal.activo} - ${signal.direction.toUpperCase()} - ${signal.formattedTime}`;
+                        listbox.appendChild(div);
+                    });
+                }
+                
+                log(`✅ Generación completada. ${signals.length} señales encontradas.`);
+            } catch (error) {
+                log(`❌ Error al generar señales: ${error.message}`);
+            } finally {
+                document.getElementById('btn-generar').disabled = false;
+            }
+        }
+
+        async function iniciarBot() {
+            if (!isConnected) {
+                alert('⚠️ Primero debes conectarte al broker');
+                return;
+            }
+
+            if (signals.length === 0) {
+                alert('⚠️ Primero debes generar señales');
+                return;
+            }
+
+            const config = getConfiguracion();
+            log('🚀 Iniciando bot de trading...');
+            
+            try {
+                bot = new TradingBot(config, signals, log, updateUI);
+                await bot.start();
+                
+                document.getElementById('btn-iniciar').disabled = true;
+                document.getElementById('btn-detener').disabled = false;
+                document.getElementById('btn-generar').disabled = true;
+                
+                log('✅ Bot iniciado correctamente');
+            } catch (error) {
+                log(`❌ Error al iniciar bot: ${error.message}`);
+            }
+        }
+
+        async function detenerBot() {
+            if (bot) {
+                await bot.stop();
+                bot = null;
+                
+                document.getElementById('btn-iniciar').disabled = false;
+                document.getElementById('btn-detener').disabled = true;
+                document.getElementById('btn-generar').disabled = false;
+                
+                log('⏹️ Bot detenido');
+            }
+        }
+
+        function updateUI(data) {
+            if (data.balance !== undefined) {
+                document.getElementById('balance-actual').textContent = `$${data.balance.toFixed(2)}`;
+            }
+            if (data.operaciones !== undefined) {
+                document.getElementById('total-operaciones').textContent = data.operaciones;
+            }
+            if (data.perdidasConsecutivas !== undefined) {
+                document.getElementById('perdidas-consecutivas').textContent = data.perdidasConsecutivas;
+            }
+        }
+
+        // Deshabilitar botones inicialmente
+        document.getElementById('btn-detener').disabled = true;
+    </script>
+</body>
+</html>
