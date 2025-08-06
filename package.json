@@ -1,30 +1,34 @@
 {
   "name": "esposo-trader-bot",
   "version": "3.0.0",
-  "description": "Bot de Trading para IQ Option - Versión Electron",
+  "description": "Bot de Trading para IQ Option y Exnova - Versión Electron",
   "main": "main.js",
   "scripts": {
     "start": "electron . --no-sandbox",
-    "dev": "electron . --no-sandbox --enable-logging",
-    "build": "electron-builder",
-    "dist": "electron-builder --publish=never"
+    "dev": "node scripts/dev.js",
+    "build": "node scripts/build.js",
+    "build-all": "node scripts/build.js --all",
+    "dist": "electron-builder --publish=never",
+    "clean": "rimraf dist/ data/",
+    "test": "echo \"Tests no implementados\" && exit 0"
   },
-  "keywords": [
-    "trading",
-    "bot",
-    "iq-option",
-    "electron"
-  ],
+  "keywords": ["trading", "bot", "iq-option", "exnova", "electron", "javascript"],
   "author": "Esposo Trader",
   "license": "MIT",
+  "homepage": "https://github.com/esposotrader/bot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/esposotrader/bot.git"
+  },
   "dependencies": {
-    "axios": "^1.6.0",
     "electron": "^28.0.0",
-    "node-fetch": "^3.3.2",
-    "ws": "^8.18.3"
+    "axios": "^1.6.0",
+    "ws": "^8.18.3",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "electron-builder": "^24.6.0"
+    "electron-builder": "^24.6.0",
+    "rimraf": "^3.0.2"
   },
   "build": {
     "appId": "com.esposotrader.bot",
@@ -33,8 +37,37 @@
       "output": "dist"
     },
     "files": [
-      "**/*",
-      "!node_modules/**/*"
-    ]
+      "main.js",
+      "renderer/**/*",
+      "services/**/*", 
+      "config/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraFiles": [
+      "README.md",
+      "INSTRUCCIONES_DE_USO.md",
+      ".env.example"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg", 
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
