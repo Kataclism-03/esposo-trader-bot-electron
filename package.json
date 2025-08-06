@@ -1,73 +1,48 @@
 {
   "name": "esposo-trader-bot",
-  "version": "3.0.0",
-  "description": "Bot de Trading para IQ Option y Exnova - Versión Electron",
+  "version": "1.0.0",
+  "description": "Bot de trading para la plataforma de IQ Option y Exnova.",
   "main": "main.js",
   "scripts": {
-    "start": "electron . --no-sandbox",
-    "dev": "node scripts/dev.js",
-    "build": "node scripts/build.js",
-    "build-all": "node scripts/build.js --all",
-    "dist": "electron-builder --publish=never",
-    "clean": "rimraf dist/ data/",
-    "test": "echo \"Tests no implementados\" && exit 0"
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
   },
-  "keywords": ["trading", "bot", "iq-option", "exnova", "electron", "javascript"],
+  "keywords": [
+    "electron",
+    "trading",
+    "bot",
+    "iqoption",
+    "exnova"
+  ],
   "author": "Esposo Trader",
-  "license": "MIT",
-  "homepage": "https://github.com/esposotrader/bot",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/esposotrader/bot.git"
-  },
+  "license": "ISC",
   "dependencies": {
-    "electron": "^28.0.0",
-    "axios": "^1.6.0",
-    "ws": "^8.18.3",
-    "node-fetch": "^3.3.2"
+    "axios": "^1.6.8",
+    "@tradecodehub/client-sdk-js": "^1.0.0"
   },
   "devDependencies": {
-    "electron-builder": "^24.6.0",
-    "rimraf": "^3.0.2"
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.esposotrader.bot",
+    "appId": "com.esposotrader.app",
     "productName": "Esposo Trader Bot",
+    "files": [
+      "**/*"
+    ],
     "directories": {
       "output": "dist"
     },
-    "files": [
-      "main.js",
-      "renderer/**/*",
-      "services/**/*", 
-      "config/**/*",
-      "package.json",
-      "node_modules/**/*"
-    ],
-    "extraFiles": [
-      "README.md",
-      "INSTRUCCIONES_DE_USO.md",
-      ".env.example"
-    ],
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"
     },
-    "mac": {
-      "target": "dmg", 
-      "icon": "assets/icon.icns"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
-    },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "uninstallDisplayName": "Esposo Trader Bot",
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
     }
-  },
-  "engines": {
-    "node": ">=16.0.0"
   }
 }
