@@ -4,7 +4,8 @@
   "description": "Bot de Trading para IQ Option - Versión Electron",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . --no-sandbox",
+    "dev": "electron . --no-sandbox --enable-logging",
     "build": "electron-builder",
     "dist": "electron-builder --publish=never"
   },
