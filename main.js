@@ -5,9 +5,16 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./config/config');
 const TelegramService = require('./Servicios/telegram');
-const BrokerAPI = require('./Servicios/broker-api'); // Asegúrate de que esta línea esté presente
+const BrokerAPI = require('./Servicios/broker-api');
 const TradingBot = require('./Servicios/trading-bot');
 const SignalGenerator = require('./Servicios/signals');
+
+// ... (El resto de tu código es igual)
+
+// --- Variables globales para el bot de trading ---
+let tradingBot = null;
+const selectedBrokerConfig = config.brokers.iqoption; // Selecciona la corretora a ser usada
+const brokerApi = new BrokerAPI(selectedBrokerConfig, logCallback);
 
 // ... (El resto de tu código es igual)
 
