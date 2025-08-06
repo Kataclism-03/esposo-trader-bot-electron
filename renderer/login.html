@@ -1,76 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Login - Esposo Trader Bot</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <title>Login - Esposo Trader Bot</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container login-window">
-        <div class="frame">
-            <h3>Login - Esposo Trader Bot</h3>
-            
-            <label for="correo">Correo:</label>
-            <input type="email" id="correo" placeholder="tu@email.com" style="width: 180px;">
-            
-            <br><br>
+    <div class="container login-window">
+        <div class="frame">
+            <h3>Login - Esposo Trader Bot</h3>
+            
+            <label for="correo">Correo:</label>
+            <input type="email" id="correo" placeholder="tu@email.com" style="width: 180px;">
+            
+            <br><br>
 
             <label for="contrasena">Contraseña:</label>
-            <input type="password" id="contrasena" placeholder="tu-contraseña" style="width: 180px;">
-            
-            <br><br>
-            
-            <button onclick="iniciarSesion()">🔓 Ingresar</button>
-        </div>
-    </div>
+            <input type="password" id="contrasena" placeholder="tu-contraseña" style="width: 180px;">
+            
+            <br><br>
+            
+            <button onclick="iniciarSesion()">🔓 Ingresar</button>
+        </div>
+    </div>
 
-    <script>
-        // Imul-ul-ul-ulay tayo ti IPC a panangilako para iti maysa a browser.
-        // Ti orihinal a `require('electron')` ket awan ditoy.
-        // Simulado tayo ti maysa a nagballigi a panag-login a kadua ti naireseta a kredensial para iti panangipakaammo.
+    <script>
+        const { ipcRenderer, shell } = require('electron');
 
-        async function iniciarSesion() {
-            // Alaem dagiti dua nga input
-            const correo = document.getElementById('correo').value.trim();
-            const contrasena = document.getElementById('contrasena').value.trim();
-            
-            if (!correo || !contrasena) {
-                alert('⚠️ Pangaasim, ikabilmo ti emailmo ken passwordmo');
-                return;
-            }
+        async function iniciarSesion() {
+            const correo = document.getElementById('correo').value.trim();
+            const contrasena = document.getElementById('contrasena').value.trim();
+            
+            if (!correo || !contrasena) {
+                alert('⚠️ Por favor ingresa tu correo y contraseña');
+                return;
+            }
 
-            try {
-                // Simulado tayo ti asynchronous a panawag para iti login
-                // Iti maysa a browser app, daytoy ket maysa a fetch() a panawag iti maysa a backend API.
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Naireseta a kredensial para iti daytoy a browser.
-                // Iti maysa a pudno nga aplikasion, daytoy ket maysa a panagkita kadagiti sungbat ti API.
-                const isLoggedIn = (correo === 'test@example.com' && contrasena === 'password');
+            try {
+                // Paso 1: Intentar el login en el bróker
+                const userId = await ipcRenderer.invoke('login-broker', { email: correo, password: contrasena });
                 
-                if (isLoggedIn) {
-                    // No nagballigi ti login, ibalbaliw ti bintana ti bot
-                    alert('✅ Login successful! Redirecting to bot page.');
-                } else {
-                    // No saan a nagballigi, ipakaammo ti error
-                    alert('❌ Error ti koneksion wenno di umiso a kredensial. Pangaasim, kitaem ti datam ken panunotem manen.');
-                }
-            } catch (error) {
-                alert('❌ Nagkama ti di ninamnama nga error bayat ti login: ' + error.message);
-            }
-        }
+                if (!userId) {
+                    alert('❌ Error de conexión o credenciales incorrectas. Por favor, revisa tus datos y reintenta.');
+                    return;
+                }
 
-        // Panangsuporta iti Enter key
-        document.getElementById('correo').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                iniciarSesion();
-            }
-        });
+                // Paso 2: Verificar si el ID del usuario está en la lista de afiliados
+                const esAfiliado = await ipcRenderer.invoke('check-affiliate-by-id', userId);
+
+                if (!esAfiliado) {
+                    const respuesta = confirm('❌ No estás registrado como afiliado.\n\n¿Quieres contactar con soporte técnico?');
+                    if (respuesta) {
+                        shell.openExternal('https://t.me/SoporteEXPOSOTRADER');
+                    }
+                    return;
+                }
+
+                // Si ambos pasos son exitosos, muestra la ventana del bot
+                ipcRenderer.invoke('show-bot');
+
+            } catch (error) {
+                alert('❌ Ocurrió un error inesperado durante el login: ' + error.message);
+            }
+        }
+
+        document.getElementById('correo').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                iniciarSesion();
+            }
+        });
         document.getElementById('contrasena').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                iniciarSesion();
-            }
-        });
-    </script>
+            if (e.key === 'Enter') {
+                iniciarSesion();
+            }
+        });
+    </script>
 </body>
 </html>
