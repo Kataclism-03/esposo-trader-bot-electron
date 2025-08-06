@@ -88,4 +88,100 @@ class TradingBot {
 
     verificarStopLoss() {
         if (this.balanceActual <= this.balanceInicial - this.config.stopLoss) {
-            const perdida = this
+            const perdida = this.balanceInicial - this.balanceActual;
+            this.logCallback(`⛔️ Stop-Loss alcanzado. Bot detenido. Pérdida: $${perdida.toFixed(2)}`);
+            TelegramService.notificarStopLoss(perdida, this.balanceInicial, this.balanceActual);
+            this.isRunning = false;
+            return true;
+        }
+        return false;
+    }
+
+    verificarTakeProfit() {
+        if (this.balanceActual >= this.balanceInicial + this.config.takeProfit) {
+            const ganancia = this.balanceActual - this.balanceInicial;
+            this.logCallback(`✅ Take-Profit alcanzado. Bot detenido. Ganancia: $${ganancia.toFixed(2)}`);
+            TelegramService.notificarTakeProfit(ganancia, this.balanceInicial, this.balanceActual);
+            this.isRunning = false;
+            return true;
+        }
+        return false;
+    }
+
+    verificarLimitePerdidasConsecutivas() {
+        if (this.perdidasConsecutivas >= this.maxPerdidasConsecutivas) {
+            this.logCallback(`❌ Límite de ${this.maxPerdidasConsecutivas} pérdidas consecutivas alcanzado. Bot detenido.`);
+            TelegramService.notificarLimitePerdidasConsecutivas(this.perdidasConsecutivas);
+            this.isRunning = false;
+            return true;
+        }
+        return false;
+    }
+
+    calcularMontoOperacion() {
+        // Si la martingala está activada y hay pérdidas consecutivas, se calcula el nuevo monto
+        if (this.config.martingale.enabled && this.perdidasConsecutivas > 0) {
+            this.montoActual = this.config.trading.defaultAmount * Math.pow(this.config.martingale.multiplier, this.perdidasConsecutivas);
+        } else {
+            this.montoActual = this.config.trading.defaultAmount;
+        }
+
+        if (this.montoActual > this.balanceActual) {
+            this.logCallback('⚠️ Capital insuficiente. Reiniciando monto de martingala.');
+            this.montoActual = this.config.trading.defaultAmount;
+            this.perdidasConsecutivas = 0;
+        }
+
+        return this.montoActual;
+    }
+
+    async ejecutarOperacion(signal) {
+        const monto = this.calcularMontoOperacion();
+        
+        try {
+            this.logCallback(`📈 Ejecutando operación ${signal.direction.toUpperCase()} en ${signal.activo} con $${monto.toFixed(2)}`);
+            
+            const option = await this.brokerApi.buyBlitzOption(signal.activo, signal.direction, monto);
+            
+            if (!option) {
+                this.logCallback("❗ La operación no se pudo ejecutar.");
+                return;
+            }
+
+            this.totalOperaciones++;
+
+            // La información del resultado y el payout ahora se obtiene directamente del objeto 'option'
+            const winResult = option.status;
+            const payout = option.payout;
+            
+            if (winResult === 'win') {
+                this.perdidasConsecutivas = 0;
+                const ganancia = monto * (payout / 100);
+                this.balanceActual += ganancia;
+                this.logCallback(`✅ Operación ganadora! Ganancia: $${ganancia.toFixed(2)} | Balance: $${this.balanceActual.toFixed(2)}`);
+                TelegramService.notificarOperacion('win', ganancia, monto, this.balanceActual);
+            } else if (winResult === 'loss') {
+                this.perdidasConsecutivas++;
+                this.balanceActual -= monto;
+                this.logCallback(`❌ Operación perdedora. Pérdida: $${monto.toFixed(2)} | Balance: $${this.balanceActual.toFixed(2)} | Pérdidas consecutivas: ${this.perdidasConsecutivas}`);
+                TelegramService.notificarOperacion('loss', -monto, monto, this.balanceActual);
+            } else { // El resultado es 'equal' o 'expired' (empate)
+                this.perdidasConsecutivas = 0;
+                this.logCallback(`➖ Operación empatada. Balance: $${this.balanceActual.toFixed(2)}`);
+                TelegramService.notificarOperacion('equal', 0, monto, this.balanceActual);
+            }
+            
+            this.uiCallback({
+                balance: this.balanceActual,
+                operaciones: this.totalOperaciones,
+                perdidasConsecutivas: this.perdidasConsecutivas
+            });
+            
+        } catch (error) {
+            this.logCallback(`❗ Error al ejecutar operación: ${error.message}`);
+            TelegramService.notificarError(`Error en operación: ${error.message}`);
+        }
+    }
+}
+
+module.exports = TradingBot;
