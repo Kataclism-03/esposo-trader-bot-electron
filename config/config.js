@@ -14,5 +14,7 @@ module.exports = {
     defaultAmount: 10,
     stopLoss: 50,
     takeProfit: 100
-  }
+  },
+  // La URL de tu lista de afiliados (ahora con IDs de usuario)
+  affiliateListUrl: 'https://gist.githubusercontent.com/TuUsuario/UnaCadenaLargaDeNumeros/raw/OtraCadena/usuarios-afiliados.json'
 };
