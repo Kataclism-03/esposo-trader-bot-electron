@@ -8,14 +8,19 @@
     "build": "electron-builder",
     "dist": "electron-builder --publish=never"
   },
-  "keywords": ["trading", "bot", "iq-option", "electron"],
+  "keywords": [
+    "trading",
+    "bot",
+    "iq-option",
+    "electron"
+  ],
   "author": "Esposo Trader",
   "license": "MIT",
   "dependencies": {
-    "electron": "^28.0.0",
     "axios": "^1.6.0",
-    "ws": "^8.14.0",
-    "node-fetch": "^3.3.0"
+    "electron": "^28.0.0",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "electron-builder": "^24.6.0"
