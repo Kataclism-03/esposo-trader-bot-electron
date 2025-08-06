@@ -4,9 +4,10 @@ const { ClientSdk, LoginPasswordAuthMethod, BalanceType } = require('@tradecodeh
 const config = require('../config/config');
 
 class BrokerAPI {
-    constructor() {
+    constructor(brokerConfig) {
         this.sdk = null;
         this.logCallback = null;
+        this.brokerConfig = brokerConfig;
     }
 
     setCredentials(email, password) {
@@ -22,9 +23,9 @@ class BrokerAPI {
         this.logCallback("Conectando con el bróker a través del Client SDK...");
         try {
             this.sdk = await ClientSdk.create(
-                config.brokers.wsUrl,
-                config.brokers.connectionId,
-                new LoginPasswordAuthMethod(config.brokers.apiUrl, this.email, this.password)
+                this.brokerConfig.wsUrl,
+                this.brokerConfig.connectionId,
+                new LoginPasswordAuthMethod(this.brokerConfig.apiUrl, this.email, this.password)
             );
             this.logCallback("Conexión exitosa.");
             return true;
@@ -59,6 +60,19 @@ class BrokerAPI {
         const quotes = await this.sdk.quotes();
         const currentQuote = await quotes.getCurrentQuoteForActive(activeId);
         return currentQuote;
+    }
+    
+    async getCandles(activeName, timeframe, count) {
+        if (!this.sdk) {
+            throw new Error("SDK no está conectado.");
+        }
+        try {
+            const candles = await this.sdk.candles().getCandles(activeName, timeframe, count);
+            return candles;
+        } catch (error) {
+            this.logCallback(`Error al obtener velas: ${error.message}`);
+            throw error;
+        }
     }
 
     async buyBlitzOption(activeId, direction, amount) {
@@ -99,9 +113,6 @@ class BrokerAPI {
             return null;
         }
     }
-
-    // Agrega más funciones para otras operaciones de trading según tu lógica
-    // como buyTurboOption, buyBinaryOption, etc.
 }
 
 module.exports = BrokerAPI;
